@@ -1,0 +1,18 @@
+# IDE
+.idea/
+.vscode/
+
+# Go
+*.exe
+*.test
+*.out
+
+# env / secrets
+.env
+*.local.yaml
+
+# local note token
+planning
+
+#local testing
+jwks.json
