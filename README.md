@@ -3,7 +3,7 @@
 Authorization middleware for [MCP](https://modelcontextprotocol.io) servers, implementing the MCP authorization spec's
 OAuth 2.1 requirements as of the **2026-07-28** revision.
 
-Built on [`polytoken`](https://github.com/evancaplan/polytoken), a multi-issuer JWT validation library. `polytoken-mcp`
+Built on [`polytoken`](https://github.com/evancaplan/polytoken), a multi-issuer JWT validatieon library. `polytoken-mcp`
 extends that validation with the MCP-specific checks the spec added on top of standard OAuth 2.1: resource binding,
 issuer binding, and confused-deputy prevention.
 

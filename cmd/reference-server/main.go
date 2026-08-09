@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -13,11 +12,6 @@ import (
 	"github.com/evancaplan/polytoken/validator"
 )
 
-// TODO: pick real values for a working local demo. These four constants
-// need to be consistent with each other — e.g. resourceURI is what both
-// the PRM document AND the guard's expectedResource check against, so a
-// typo/mismatch between them would make every request 401 even with a
-// perfectly valid token.
 const (
 	resourceURI    = "http://localhost:8080"
 	issuerURI      = "https://test.local"
@@ -49,19 +43,6 @@ func main() {
 	mux.Handle(prmPath, prmHandler)
 	mux.Handle("/mcp", guard.Wrap(protected))
 
-	//upstreamClient := &http.Client{
-	//	Transport: passthrough.NewGuard(http.DefaultTransport),
-	//}
-
 	log.Println("listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
-}
-
-func generateDemoSecret() ([]byte, error) {
-	secret := make([]byte, 32)
-	_, err := rand.Read(secret)
-	if err != nil {
-		return nil, err
-	}
-	return secret, nil
 }
