@@ -1,0 +1,3 @@
+go test fuzz v1
+string("https://Auth.e\x85Amp0")
+string("https://Auth.e\x92Amp0")

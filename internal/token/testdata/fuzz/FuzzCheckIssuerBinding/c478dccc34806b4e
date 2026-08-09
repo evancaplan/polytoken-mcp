@@ -1,0 +1,3 @@
+go test fuzz v1
+string("\x80TTPS://AUTH.EXAMPLE.C")
+string("\xb2ttps://auth.example.c")
