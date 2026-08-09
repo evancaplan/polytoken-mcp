@@ -38,3 +38,20 @@ func TestCheckIssuerBinding_CaseSensitivity(t *testing.T) {
 		t.Errorf("CheckIssuerBinding returned unexpected error: %v", err)
 	}
 }
+
+func FuzzCheckIssuerBinding(f *testing.F) {
+	f.Add("https://auth.example.com", "https://auth.example.com")
+	f.Add("https://auth.example.com", "https://evil.example.com")
+	f.Add("HTTPS://AUTH.EXAMPLE.COM", "https://auth.example.com")
+	f.Add("", "https://auth.example.com")
+	f.Add("https://auth.example.com", "")
+	f.Add("", "")
+	f.Add("not-a-url", "https://auth.example.com")
+	f.Add("https://auth.example.com\x00", "https://auth.example.com")
+
+	f.Fuzz(func(t *testing.T, iss string, expectedIssuer string) {
+		p := &principal.Principal{Iss: iss}
+
+		_ = CheckIssuerBinding(p, expectedIssuer)
+	})
+}
