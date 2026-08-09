@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/evancaplan/polytoken-mcp/internal/challenge"
-	"github.com/evancaplan/polytoken-mcp/internal/token"
+	"github.com/evancaplan/polytoken-mcp/challenge"
+	"github.com/evancaplan/polytoken-mcp/token"
 
 	"github.com/evancaplan/polytoken/principal"
 )

@@ -6,11 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/evancaplan/polytoken-mcp/token"
 	"github.com/evancaplan/polytoken/principal"
 	"github.com/evancaplan/polytoken/resolver"
 	"github.com/evancaplan/polytoken/validator"
-
-	"github.com/evancaplan/polytoken-mcp/internal/token"
 )
 
 type fakeValidator struct {

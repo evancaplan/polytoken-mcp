@@ -3,7 +3,7 @@
 Authorization middleware for [MCP](https://modelcontextprotocol.io) servers, implementing the MCP authorization spec's
 OAuth 2.1 requirements as of the **2026-07-28** revision.
 
-Built on [`polytoken`](https://github.com/evancaplan/polytoken), a multi-issuer JWT validatieon library. `polytoken-mcp`
+Built on [`polytoken`](https://github.com/evancaplan/polytoken), a multi-issuer JWT validation library. `polytoken-mcp`
 extends that validation with the MCP-specific checks the spec added on top of standard OAuth 2.1: resource binding,
 issuer binding, and confused-deputy prevention.
 
@@ -46,17 +46,26 @@ Outgoing requests to upstream APIs:
 └─────────────────────────────────────────┘
 ```
 
+## Installation
+
+```bash
+go get github.com/evancaplan/polytoken-mcp
+```
+
+`discovery`, `token`, `challenge`, `middleware`, and `passthrough` are all public packages, importable directly by
+any Go project.
+
 ## Quickstart
 
 ```go
 import (
-"net/http"
+	"net/http"
 
-"github.com/evancaplan/polytoken-mcp/internal/discovery"
-"github.com/evancaplan/polytoken-mcp/internal/middleware"
-"github.com/evancaplan/polytoken-mcp/internal/token"
-"github.com/evancaplan/polytoken/resolver"
-"github.com/evancaplan/polytoken/validator"
+	"github.com/evancaplan/polytoken-mcp/discovery"
+	"github.com/evancaplan/polytoken-mcp/middleware"
+	"github.com/evancaplan/polytoken-mcp/token"
+	"github.com/evancaplan/polytoken/resolver"
+	"github.com/evancaplan/polytoken/validator"
 )
 
 hs256 := validator.NewHs256Validator("https://auth.example.com", []byte("your-secret"))
@@ -99,17 +108,17 @@ Every hand-written parsing/comparison path (the two places this project does its
 delegating to `polytoken`) is fuzz-tested using Go's native fuzzing (`go test -fuzz`).
 
 | Function                 | What it checks                      | Duration | Executions | Crashes |
-|--------------------------|-------------------------------------|----------|------------|---------|
+|--------------------------|--------------------------------------|----------|------------|---------|
 | `CheckResourceIndicator` | RFC 8707 audience/resource matching | 10 min   | ~92.1M     | 0       |
 | `CheckIssuerBinding`     | RFC 9207 issuer matching            | 10 min   | ~104.5M    | 0       |
 
 Seed corpus includes exact matches, mismatches, case differences, trailing-slash variants, empty values, malformed URIs,
-unicode lookalikes, and control characters. Discovered corpus is committed under `internal/token/testdata/fuzz/` and
+unicode lookalikes, and control characters. Discovered corpus is committed under `token/testdata/fuzz/` and
 replayed automatically as regression tests on every `go test` run.
 
 ```bash
-go test -fuzz=FuzzCheckResourceIndicator -fuzztime=60s ./internal/token
-go test -fuzz=FuzzCheckIssuerBinding -fuzztime=60s ./internal/token
+go test -fuzz=FuzzCheckResourceIndicator -fuzztime=60s ./token
+go test -fuzz=FuzzCheckIssuerBinding -fuzztime=60s ./token
 ```
 
 Increase `-fuzztime` for a longer run. Any newly discovered crash is saved to `testdata/fuzz/<FuzzName>/` and becomes a
@@ -129,6 +138,17 @@ A few deliberate decisions worth calling out for anyone reviewing this:
 - **Fail-open in the confused-deputy guard when there's no inbound token to compare against.** `passthrough.Guard` only
   blocks a request when it can prove the outgoing token exactly matches a stashed inbound token; if nothing was stashed,
   the call is allowed through, since there's nothing to guard against yet.
+
+## Project layout
+
+```
+cmd/reference-server   a full, runnable demonstration of the middleware
+discovery              Protected Resource Metadata (RFC 9728) handler
+token                  token validation, resource indicator + issuer binding checks
+challenge              401 + WWW-Authenticate response helper
+middleware             the Guard that ties the above together into an http.Handler wrapper
+passthrough            the confused-deputy RoundTripper guard
+```
 
 ## Status
 

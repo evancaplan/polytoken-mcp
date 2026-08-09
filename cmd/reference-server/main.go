@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/evancaplan/polytoken-mcp/internal/discovery"
-	"github.com/evancaplan/polytoken-mcp/internal/middleware"
-	"github.com/evancaplan/polytoken-mcp/internal/token"
+	"github.com/evancaplan/polytoken-mcp/discovery"
+	"github.com/evancaplan/polytoken-mcp/middleware"
+	"github.com/evancaplan/polytoken-mcp/token"
 	"github.com/evancaplan/polytoken/resolver"
 	"github.com/evancaplan/polytoken/validator"
 )
