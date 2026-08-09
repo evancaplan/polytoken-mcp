@@ -33,7 +33,7 @@ type tokenContextKey struct{}
 func (g *Guard) RoundTrip(req *http.Request) (*http.Response, error) {
 	inbound, ok := TokenFromContext(req.Context())
 	outbound := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
-	
+
 	if ok && outbound == inbound {
 		return nil, ErrTokenPassthrough
 	}

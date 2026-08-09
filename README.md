@@ -102,6 +102,11 @@ curl -i http://localhost:8080/mcp                                              #
 curl -H "Authorization: Bearer <token-from-mint>" http://localhost:8080/mcp    # 200
 ```
 
+The `/mcp` handler also demonstrates `passthrough.Guard`: it deliberately tries to forward the
+client's inbound token, unmodified, to a stand-in upstream API (`/upstream/echo`) over an
+`http.Client` whose `Transport` is a `passthrough.Guard`. The response's `passthrough_blocked`
+field is `true` because the guard refuses that exact-token forward at the transport layer.
+
 ## Security Testing
 
 Every hand-written parsing/comparison path (the two places this project does its own claim-shape handling rather than
