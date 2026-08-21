@@ -31,17 +31,13 @@ func main() {
 
 	prmURL := resourceURI + prmPath
 	guard := middleware.NewGuard(tv, resourceURI, issuerURI, prmURL)
-	prmHandler := discovery.NewHandler(resourceURI, []string{issuerURI}, discovery.WithResourceDocumentation(prmURL))
+	prmHandler := discovery.NewHandler(resourceURI, []string{issuerURI}, discovery.WithResourceDocumentation("https://github.com/evancaplan/polytoken-mcp"))
 
-	// upstreamClient stands in for the http.Client this server would use to
-	// call a downstream API on the client's behalf. Routing it through
-	// passthrough.Guard means any attempt to forward the client's inbound
-	// MCP token to that downstream API unmodified gets refused.
+	// upstreamClient stands in for calling a downstream API; passthrough.Guard
+	// refuses to forward the client's inbound MCP token unmodified.
 	upstreamClient := &http.Client{Transport: passthrough.NewGuard(nil)}
 
-	// upstream is a stand-in for a real downstream API, so the demo below
-	// has something to call and can show what Authorization header it
-	// actually received.
+	// upstream is a stand-in downstream API that echoes back the Authorization header it received.
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"received_authorization": r.Header.Get("Authorization")})
@@ -57,9 +53,7 @@ func main() {
 		inboundAuth := r.Header.Get("Authorization")
 		ctx := passthrough.WithToken(r.Context(), strings.TrimPrefix(inboundAuth, "Bearer "))
 
-		// Deliberately try to forward the client's inbound token to the
-		// upstream API unmodified, the way a confused-deputy bug would.
-		// passthrough.Guard refuses this at the transport layer.
+		// Deliberately try to forward the inbound token unmodified; passthrough.Guard refuses it.
 		upstreamReq, err := http.NewRequestWithContext(ctx, http.MethodGet, resourceURI+upstreamPath, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

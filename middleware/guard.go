@@ -10,16 +10,11 @@ import (
 	"github.com/evancaplan/polytoken/principal"
 )
 
-// principalContextKey is an unexported type, so this package's context key
-// can never collide with a key from another package, even if they happen
-// to use the same underlying string.
+// principalContextKey is unexported so it can't collide with keys from other packages.
 type principalContextKey struct{}
 
-// Guard wraps an http.Handler with MCP-spec authorization: validates the
-// bearer token, confirms it was issued for this resource, and confirms it
-// came from the expected authorization server. Requests that fail any
-// check get a 401 with a WWW-Authenticate challenge instead of reaching
-// the wrapped handler.
+// Guard wraps an http.Handler with MCP-spec authorization: validates the bearer
+// token and checks its resource and issuer. Failing requests get a 401 challenge.
 type Guard struct {
 	validator        *token.Validator
 	expectedResource string
@@ -36,8 +31,7 @@ func NewGuard(v *token.Validator, expectedResource, expectedIssuer, prmURL strin
 	}
 }
 
-// Wrap returns an http.Handler that enforces this Guard's checks before
-// delegating to next.
+// Wrap returns an http.Handler that enforces this Guard's checks before delegating to next.
 func (g *Guard) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		princ, err := g.validator.Validate(r.Context(), r)

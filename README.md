@@ -1,25 +1,37 @@
 # polytoken-mcp
 
-Authorization middleware for [MCP](https://modelcontextprotocol.io) servers, implementing the MCP authorization spec's
-OAuth 2.1 requirements as of the **2026-07-28** revision.
+Authorization middleware for [MCP](https://modelcontextprotocol.io) servers, implementing the OAuth 2.1 requirements
+of the MCP authorization spec through the **2026-07-28** revision.
 
 Built on [`polytoken`](https://github.com/evancaplan/polytoken), a multi-issuer JWT validation library. `polytoken-mcp`
-extends that validation with the MCP-specific checks the spec added on top of standard OAuth 2.1: resource binding,
-issuer binding, and confused-deputy prevention.
+extends that validation with the MCP-specific checks layered on top of standard OAuth 2.1: resource binding, issuer
+binding, and token-passthrough prevention.
+
+Write-up of the design and the reasoning behind it: [The Four Checks Most MCP Servers
+Skip](https://www.evancaplan.dev/blog/go-mcp-auth).
 
 ## Why this exists
 
-As of the MCP spec's July 2026 revision, MCP servers are formally OAuth 2.1 resource servers. Despite that, only a small
-fraction of MCP servers currently implement the spec's authorization requirements correctly. `polytoken-mcp` is a
-drop-in Go middleware that handles the parts of the spec that are easy to get subtly wrong:
+MCP servers have been OAuth 2.1 resource servers since the spec's June 2025 revision, which introduced Protected
+Resource Metadata (RFC 9728) and resource indicators (RFC 8707). The 2026-07-28 revision hardened authorization
+further, adding RFC 9207 issuer validation among other changes.
+
+Adoption has not kept pace. Astrix Security's ["State of MCP Server Security
+2025"](https://astrix.security/learn/blog/state-of-mcp-server-security-2025/) analyzed over 5,200 open-source MCP
+server implementations and found only 8.5% using OAuth at all.
+
+`polytoken-mcp` is a drop-in Go middleware covering the parts of the spec that are easy to get subtly wrong:
 
 - **Discovery**: serves OAuth 2.0 Protected Resource Metadata (RFC 9728) so clients can find out how to authenticate
 - **Token validation**: signature and expiry checks, delegated to `polytoken`
 - **Resource Indicators** (RFC 8707): confirms a token was actually issued *for this server*, not replayed from another
   MCP server
-- **Issuer binding** (RFC 9207): confirms the token came from the authorization server this client was actually supposed
-  to use, preventing AS mix-up attacks
-- **Confused-deputy prevention**: refuses to forward a client's inbound token to an upstream API unmodified
+- **Issuer binding** (RFC 9207): confirms the token came from the authorization server this client was supposed to use,
+  closing the authorization-server mix-up
+- **Token-passthrough prevention**: refuses to forward a client's inbound token to an upstream API unmodified
+
+Both hand-written comparison paths are fuzz-tested, with ~92M and ~105M executions and no crashes. Details under
+[Security Testing](#security-testing).
 
 ## Architecture
 
@@ -136,13 +148,24 @@ A few deliberate decisions worth calling out for anyone reviewing this:
 - **Uniform 401 response.** Whether a request fails on missing auth, resource mismatch, or issuer mismatch, the client
   sees the same generic `401 {"error":"unauthorized"}` with a `WWW-Authenticate` challenge. The specific failure reason
   is never leaked to an unauthenticated caller.
-- **Case-insensitive resource/issuer comparison.** Technically a minor deviation from RFC 3986 (which only treats scheme
-  and host as case-insensitive, not the full path). Accepted as a simplicity/practicality tradeoff for this
-  implementation, since resource and issuer URIs in practice are effectively fixed, lowercase configuration values
-  rather than user-supplied paths.
-- **Fail-open in the confused-deputy guard when there's no inbound token to compare against.** `passthrough.Guard` only
-  blocks a request when it can prove the outgoing token exactly matches a stashed inbound token; if nothing was stashed,
-  the call is allowed through, since there's nothing to guard against yet.
+- **Case-insensitive resource/issuer comparison.** Technically a minor deviation from RFC 3986, which only treats
+  scheme and host as case-insensitive, not the full path. Accepted as a simplicity/practicality tradeoff, since
+  resource and issuer URIs in practice are fixed, lowercase configuration values rather than user-supplied paths.
+- **`passthrough.Guard` is a heuristic, not a proof.** It blocks a request when the outgoing token is byte-for-byte
+  identical to a stashed inbound token. It won't catch the same token moved into a query parameter or a request body,
+  or a token exchanged for a different one that still carries the client's identity. It also has a known false
+  positive: a token legitimately valid for both this server and the upstream is refused anyway. An opt-out for
+  specific requests is not yet implemented.
+- **Fail-open when there's nothing to compare against.** If no inbound token was stashed in context, the outgoing call
+  goes through. A server makes plenty of outgoing calls unrelated to any client's token, and blocking those by default
+  would cost real traffic to catch a problem that isn't there.
+
+## Known gaps
+
+- `scopes_supported` is not populated in the Protected Resource Metadata document, because scopes aren't enforced
+  anywhere yet. Advertising scopes that aren't checked seemed worse than omitting the field.
+- No logging on the middleware's failure paths. The client learning nothing shouldn't mean the operator learns nothing.
+- No opt-out for the `passthrough.Guard` false positive described above.
 
 ## Project layout
 
@@ -152,10 +175,10 @@ discovery              Protected Resource Metadata (RFC 9728) handler
 token                  token validation, resource indicator + issuer binding checks
 challenge              401 + WWW-Authenticate response helper
 middleware             the Guard that ties the above together into an http.Handler wrapper
-passthrough            the confused-deputy RoundTripper guard
+passthrough            the token-passthrough RoundTripper guard
 ```
 
 ## Status
 
-This is a portfolio/reference implementation of the MCP 2026-07-28 authorization spec, built as a companion to
-`polytoken`. It has not been used in a production deployment.
+This is a portfolio/reference implementation of the MCP authorization spec through the 2026-07-28 revision, built as a
+companion to `polytoken`. It has not been used in a production deployment.

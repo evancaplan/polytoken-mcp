@@ -23,9 +23,7 @@ var (
 
 const bearerPrefix = "Bearer "
 
-// Validator extracts a bearer token from an incoming request and validates
-// it via the underlying polytoken resolver, which dispatches to whichever
-// registered validator (HS256, RS256, ...) can handle the token.
+// Validator extracts a bearer token and validates it via the underlying polytoken resolver.
 type Validator struct {
 	resolver *resolver.Resolver
 }
@@ -34,8 +32,7 @@ func NewValidator(r *resolver.Resolver) *Validator {
 	return &Validator{resolver: r}
 }
 
-// Validate extracts the bearer token from the request's Authorization
-// header and validates it, returning the resolved principal on success.
+// Validate extracts and validates the bearer token, returning the resolved principal.
 func (v *Validator) Validate(ctx context.Context, r *http.Request) (*principal.Principal, error) {
 	token, err := extractBearerToken(r)
 	if err != nil {
@@ -50,10 +47,7 @@ func (v *Validator) Validate(ctx context.Context, r *http.Request) (*principal.P
 	return p, nil
 }
 
-// extractBearerToken pulls the token out of the Authorization header,
-// distinguishing missing header, wrong scheme, and empty token as
-// distinct error cases so callers (e.g. the challenge package) can
-// respond or log appropriately.
+// extractBearerToken pulls the token out of the Authorization header.
 func extractBearerToken(r *http.Request) (string, error) {
 	header := r.Header.Get("Authorization")
 	if header == "" {

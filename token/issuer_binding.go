@@ -7,15 +7,13 @@ import (
 	"github.com/evancaplan/polytoken/principal"
 )
 
-// ErrMissingIssuer means the token had no iss claim at all (or it was empty).
+// ErrMissingIssuer means the token had no iss claim.
 var ErrMissingIssuer = errors.New("token: missing issuer claim")
 
-// ErrIssuerMismatch means the token's iss claim didn't match the
-// authorization server this client was expected to use.
+// ErrIssuerMismatch means the token's iss claim didn't match the expected issuer.
 var ErrIssuerMismatch = errors.New("token: issuer mismatch")
 
-// CheckIssuerBinding verifies that the principal's issuer matches
-// expectedIssuer, per RFC 9207.
+// CheckIssuerBinding verifies the principal's issuer matches expectedIssuer, per RFC 9207.
 func CheckIssuerBinding(p *principal.Principal, expectedIssuer string) error {
 	iss := p.Iss
 	if iss == "" {

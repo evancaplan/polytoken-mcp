@@ -7,13 +7,11 @@ import (
 	"strings"
 )
 
-// ErrTokenPassthrough is returned when an outgoing upstream request would
-// have forwarded the client's original inbound token unmodified
+// ErrTokenPassthrough is returned when a request would forward the client's inbound token unmodified.
 var ErrTokenPassthrough = errors.New("passthrough: refusing to forward client token to upstream")
 
-// Guard wraps an http.RoundTripper and refuses to send any outgoing
-// request whose Authorization header exactly matches the client's
-// original inbound token.
+// Guard wraps an http.RoundTripper and refuses outgoing requests whose Authorization
+// header matches the client's original inbound token.
 type Guard struct {
 	roundTripper http.RoundTripper
 }
@@ -27,9 +25,7 @@ func NewGuard(next http.RoundTripper) *Guard {
 
 type tokenContextKey struct{}
 
-// RoundTrip implements http.RoundTripper. This is the interception point
-// every outgoing request made through an *http.Client configured with
-// this Guard as its Transport passes through here first.
+// RoundTrip implements http.RoundTripper.
 func (g *Guard) RoundTrip(req *http.Request) (*http.Response, error) {
 	inbound, ok := TokenFromContext(req.Context())
 	outbound := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")

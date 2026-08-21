@@ -8,24 +8,19 @@ import (
 // ProtectedResourceMetadata represents the RFC 9728 metadata document
 // served at /.well-known/oauth-protected-resource.
 type ProtectedResourceMetadata struct {
-	// Resource is the canonical URI identifying this protected resource
-	// (this MCP server). REQUIRED.
+	// Resource is the canonical URI of this protected resource
 	Resource string `json:"resource"`
 
-	// AuthorizationServers is the list of authorization server issuer
-	// URLs that can issue tokens for this resource. REQUIRED.
+	// AuthorizationServers can issue tokens for this resource
 	AuthorizationServers []string `json:"authorization_servers"`
 
-	// BearerMethodsSupported indicates how the client should present the
-	// token, for example, "header". OPTIONAL but recommended for clarity.
+	// BearerMethodsSupported indicates how to present the token, e.g. "header"
 	BearerMethodsSupported []string `json:"bearer_methods_supported,omitempty"`
 
-	// ResourceDocumentation is a human-facing URL describing this
-	// resource. OPTIONAL.
+	// ResourceDocumentation is a human-facing URL describing this resource
 	ResourceDocumentation string `json:"resource_documentation,omitempty"`
 
-	// ScopesSupported lists the OAuth scopes this resource understands.
-	// OPTIONAL, but useful for clients constructing an authorization request.
+	// ScopesSupported lists the OAuth scopes this resource understands
 	ScopesSupported []string `json:"scopes_supported,omitempty"`
 }
 
