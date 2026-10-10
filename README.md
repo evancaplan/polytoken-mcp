@@ -47,7 +47,7 @@ Client Request
 │  3. token.CheckIssuerBinding (RFC 9207)  │
 │                                           │
 │  ── any check fails ──▶ challenge.Unauthorized (401 + WWW-Authenticate)
-│  ── all pass ──▶ next.ServeHTTP (principal attached to context)
+│  ── all pass ──▶ next.ServeHTTP (principal.WithPrincipal; read via principal.FromContext)
 └─────────────────────────────────────────┘
 
 Outgoing requests to upstream APIs:
@@ -94,6 +94,21 @@ mux.Handle("/.well-known/oauth-protected-resource", prmHandler)
 mux.Handle("/mcp", guard.Wrap(yourMCPHandler))
 
 http.ListenAndServe(":8080", mux)
+```
+
+Handlers behind the Guard read the validated identity with `principal.FromContext`
+(`github.com/evancaplan/polytoken/principal`):
+
+```go
+yourMCPHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	p, ok := principal.FromContext(r.Context())
+	if !ok {
+		http.Error(w, "no principal in context", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("request from sub=%s iss=%s", p.Sub, p.Iss)
+	// ...
+})
 ```
 
 ### Try it against the reference server

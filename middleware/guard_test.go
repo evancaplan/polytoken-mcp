@@ -33,6 +33,7 @@ func TestGuard_Wrap_AllChecksPass(t *testing.T) {
 	iss := "https://auth.example.com"
 	resource := "https://mcp.example.com"
 	p := &principal.Principal{
+		Sub:    "user-123",
 		Iss:    iss,
 		Claims: map[string]any{"aud": resource},
 	}
@@ -42,12 +43,15 @@ func TestGuard_Wrap_AllChecksPass(t *testing.T) {
 	nextCalled := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
-		got, ok := PrincipalFromContext(r.Context())
+		got, ok := principal.FromContext(r.Context())
 		if !ok {
-			t.Error("expected principal in context")
+			t.Fatal("expected principal in context")
 		}
-		if got != p {
-			t.Errorf("principal in context: got %v, want %v", got, p)
+		if got.Sub != "user-123" {
+			t.Errorf("Sub: got %q, want %q", got.Sub, "user-123")
+		}
+		if got.Iss != iss {
+			t.Errorf("Iss: got %q, want %q", got.Iss, iss)
 		}
 	})
 
@@ -156,4 +160,57 @@ func TestGuard_Wrap_IssuerMismatch(t *testing.T) {
 		t.Errorf("rec.Code: got %d, want %d", rec.Code, http.StatusUnauthorized)
 	}
 
+}
+
+func TestGuard_Wrap_FailingCheckNeverCallsNext(t *testing.T) {
+	iss := "https://auth.example.com"
+	resource := "https://mcp.example.com"
+
+	tests := []struct {
+		name           string
+		authHeader     string
+		principal      *principal.Principal
+		expectedIssuer string
+	}{
+		{
+			name:           "missing token",
+			principal:      &principal.Principal{Sub: "user-123", Iss: iss, Claims: map[string]any{"aud": resource}},
+			expectedIssuer: iss,
+		},
+		{
+			name:           "resource mismatch",
+			authHeader:     "Bearer 123456",
+			principal:      &principal.Principal{Sub: "user-123", Iss: iss, Claims: map[string]any{"aud": "https://other.example.com"}},
+			expectedIssuer: iss,
+		},
+		{
+			name:           "issuer mismatch",
+			authHeader:     "Bearer 123456",
+			principal:      &principal.Principal{Sub: "user-123", Iss: iss, Claims: map[string]any{"aud": resource}},
+			expectedIssuer: "https://other.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := fakeValidator{canHandle: true, principal: tt.principal}
+			g := newTestGuard(&v, resource, tt.expectedIssuer)
+
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Error("next was called")
+			})
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			if tt.authHeader != "" {
+				req.Header.Set("Authorization", tt.authHeader)
+			}
+			rec := httptest.NewRecorder()
+
+			g.Wrap(next).ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Errorf("rec.Code: got %d, want %d", rec.Code, http.StatusUnauthorized)
+			}
+		})
+	}
 }

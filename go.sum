@@ -1,5 +1,7 @@
 github.com/evancaplan/polytoken v0.0.0-20260809150639-8cd5182c13bc h1:KYrfbOJSjaMmnQC6lN8Mc5Xk63BJRECMMa0yluSAt0Q=
 github.com/evancaplan/polytoken v0.0.0-20260809150639-8cd5182c13bc/go.mod h1:GIC3viaAxz6B00f76ybXZlieQV5h5gS9H46ImA8CfnA=
+github.com/evancaplan/polytoken v0.0.0-20261010225016-d04c128a98a6 h1:LRVoiUgoZqHqg5SyHDhZ62uKdT1xaQ1qAIh+/3t67fc=
+github.com/evancaplan/polytoken v0.0.0-20261010225016-d04c128a98a6/go.mod h1:GIC3viaAxz6B00f76ybXZlieQV5h5gS9H46ImA8CfnA=
 github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
 github.com/golang-jwt/jwt/v5 v5.3.1/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=

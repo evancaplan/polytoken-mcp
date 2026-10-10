@@ -11,6 +11,7 @@ import (
 	"github.com/evancaplan/polytoken-mcp/middleware"
 	"github.com/evancaplan/polytoken-mcp/passthrough"
 	"github.com/evancaplan/polytoken-mcp/token"
+	"github.com/evancaplan/polytoken/principal"
 	"github.com/evancaplan/polytoken/resolver"
 	"github.com/evancaplan/polytoken/validator"
 )
@@ -31,7 +32,12 @@ func main() {
 
 	prmURL := resourceURI + prmPath
 	guard := middleware.NewGuard(tv, resourceURI, issuerURI, prmURL)
-	prmHandler := discovery.NewHandler(resourceURI, []string{issuerURI}, discovery.WithResourceDocumentation("https://github.com/evancaplan/polytoken-mcp"))
+	prmHandler := discovery.NewHandler(
+		resourceURI,
+		[]string{issuerURI},
+		discovery.WithResourceDocumentation("https://github.com/evancaplan/polytoken-mcp"),
+		discovery.WithScopes([]string{"mcp:read", "mcp:write"}),
+	)
 
 	// upstreamClient stands in for calling a downstream API; passthrough.Guard
 	// refuses to forward the client's inbound MCP token unmodified.
@@ -44,7 +50,7 @@ func main() {
 	})
 
 	protected := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p, ok := middleware.PrincipalFromContext(r.Context())
+		p, ok := principal.FromContext(r.Context())
 		if !ok {
 			http.Error(w, "no principal in context", http.StatusInternalServerError)
 			return

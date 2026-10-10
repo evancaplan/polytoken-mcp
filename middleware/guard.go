@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/evancaplan/polytoken-mcp/challenge"
@@ -9,9 +8,6 @@ import (
 
 	"github.com/evancaplan/polytoken/principal"
 )
-
-// principalContextKey is unexported so it can't collide with keys from other packages.
-type principalContextKey struct{}
 
 // Guard wraps an http.Handler with MCP-spec authorization: validates the bearer
 // token and checks its resource and issuer. Failing requests get a 401 challenge.
@@ -50,16 +46,7 @@ func (g *Guard) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := WithPrincipal(r.Context(), princ)
+		ctx := principal.WithPrincipal(r.Context(), princ)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-}
-
-func WithPrincipal(ctx context.Context, p *principal.Principal) context.Context {
-	return context.WithValue(ctx, principalContextKey{}, p)
-}
-
-func PrincipalFromContext(ctx context.Context) (*principal.Principal, bool) {
-	p, ok := ctx.Value(principalContextKey{}).(*principal.Principal)
-	return p, ok
 }
