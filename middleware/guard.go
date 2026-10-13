@@ -16,15 +16,29 @@ type Guard struct {
 	expectedResource string
 	expectedIssuer   string
 	prmURL           string
+	sessions         SessionStore
 }
 
-func NewGuard(v *token.Validator, expectedResource, expectedIssuer, prmURL string) *Guard {
-	return &Guard{
+// Option configures optional Guard behavior.
+type Option func(*Guard)
+
+func WithSessionBinding(store SessionStore) Option {
+	return func(g *Guard) {
+		g.sessions = store
+	}
+}
+
+func NewGuard(v *token.Validator, expectedResource, expectedIssuer, prmURL string, opts ...Option) *Guard {
+	g := &Guard{
 		validator:        v,
 		expectedResource: expectedResource,
 		expectedIssuer:   expectedIssuer,
 		prmURL:           prmURL,
 	}
+	for _, opt := range opts {
+		opt(g)
+	}
+	return g
 }
 
 // Wrap returns an http.Handler that enforces this Guard's checks before delegating to next.
@@ -47,6 +61,11 @@ func (g *Guard) Wrap(next http.Handler) http.Handler {
 		}
 
 		ctx := principal.WithPrincipal(r.Context(), princ)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		r = r.WithContext(ctx)
+		if g.sessions != nil {
+			g.serveWithSessionBinding(w, r, next, Identity{Issuer: princ.Iss, Subject: princ.Sub})
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }

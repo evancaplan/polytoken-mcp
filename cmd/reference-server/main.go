@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/evancaplan/polytoken-mcp/discovery"
 	"github.com/evancaplan/polytoken-mcp/middleware"
@@ -31,7 +32,8 @@ func main() {
 	tv := token.NewValidator(res)
 
 	prmURL := resourceURI + prmPath
-	guard := middleware.NewGuard(tv, resourceURI, issuerURI, prmURL)
+	sessions := middleware.NewMemorySessionStore(30 * time.Minute)
+	guard := middleware.NewGuard(tv, resourceURI, issuerURI, prmURL, middleware.WithSessionBinding(sessions))
 	prmHandler := discovery.NewHandler(
 		resourceURI,
 		[]string{issuerURI},

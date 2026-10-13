@@ -5,7 +5,7 @@ of the MCP authorization spec through the **2026-07-28** revision.
 
 Built on [`polytoken`](https://github.com/evancaplan/polytoken), a multi-issuer JWT validation library. `polytoken-mcp`
 extends that validation with the MCP-specific checks layered on top of standard OAuth 2.1: resource binding, issuer
-binding, and token-passthrough prevention.
+binding, token-passthrough prevention, and session binding.
 
 Write-up of the design and the reasoning behind it: [The Four Checks Most MCP Servers
 Skip](https://www.evancaplan.dev/blog/go-mcp-auth).
@@ -29,6 +29,8 @@ server implementations and found only 8.5% using OAuth at all.
 - **Issuer binding** (RFC 9207): confirms the token came from the authorization server this client was supposed to use,
   closing the authorization-server mix-up
 - **Token-passthrough prevention**: refuses to forward a client's inbound token to an upstream API unmodified
+- **Session binding** (opt-in, stateful servers): ties each `Mcp-Session-Id` to the issuer and subject that created
+  it, so another user's valid token can't drive someone else's session. See [Session binding](#session-binding).
 
 Both hand-written comparison paths are fuzz-tested, with ~92M and ~105M executions and no crashes. Details under
 [Security Testing](#security-testing).
@@ -45,8 +47,10 @@ Client Request
 │  1. token.Validator.Validate             │──▶ polytoken resolver (HS256/RS256)
 │  2. token.CheckResourceIndicator (RFC 8707)
 │  3. token.CheckIssuerBinding (RFC 9207)  │
+│  4. session binding (if WithSessionBinding)
 │                                           │
-│  ── any check fails ──▶ challenge.Unauthorized (401 + WWW-Authenticate)
+│  ── checks 1-3 fail ──▶ challenge.Unauthorized (401 + WWW-Authenticate)
+│  ── session not owned by caller ──▶ 404 session not found
 │  ── all pass ──▶ next.ServeHTTP (principal.WithPrincipal; read via principal.FromContext)
 └─────────────────────────────────────────┘
 
@@ -134,6 +138,46 @@ client's inbound token, unmodified, to a stand-in upstream API (`/upstream/echo`
 `http.Client` whose `Transport` is a `passthrough.Guard`. The response's `passthrough_blocked`
 field is `true` because the guard refuses that exact-token forward at the transport layer.
 
+## Session binding
+
+Only relevant to **stateful** Streamable HTTP servers. Stateless servers have no session to hijack and don't need it.
+
+With the Go MCP SDK's stateful `StreamableHTTPHandler`, tool handlers run on the *session's* context, which is derived
+from the request that sent `initialize`. The Guard validates every HTTP request and puts the principal on that
+request's context, but a later request's context never reaches the tool call. So if Bob opens a session and Scott
+sends his own valid token along with Bob's `Mcp-Session-Id`, the Guard accepts Scott's token and the tool runs as
+Bob. Each layer is correct on its own; the leak is the seam between them.
+
+`WithSessionBinding` closes it:
+
+```go
+sessions := middleware.NewMemorySessionStore(30 * time.Minute)
+guard := middleware.NewGuard(v, resource, issuer, prmURL, middleware.WithSessionBinding(sessions))
+```
+
+- A request with no `Mcp-Session-Id` (i.e. `initialize`) is passed through; if the response is 2xx and sets
+  `Mcp-Session-Id`, that session is bound to the caller's `(iss, sub)`. The binding is recorded when the response
+  status is written, before the client can see the session ID.
+- A request carrying `Mcp-Session-Id` must come from the exact same `iss` and `sub` (byte-for-byte; a `sub` is only
+  unique per issuer). Otherwise: `404 session not found`, the same response as an unknown session, so a caller
+  can't tell a real session ID from a fake one. Per the MCP spec, a client receiving 404 starts a new session.
+- A `DELETE` from the owner removes the binding once the handler answers it with a 2xx; a failed `DELETE` leaves it.
+- A session ID already bound to a different identity is never rebound: the response fails closed with a 500 and
+  the session ID is stripped.
+- Binding runs after token validation, RFC 8707, and RFC 9207 have passed, so it always has a validated principal.
+
+`NewMemorySessionStore(ttl)` expires bindings after `ttl` with no requests on the session, measured from when the
+last request *finished* (matching the SDK's idle timer). Set it at least as long as your SDK `SessionTimeout`, or
+idle-but-live sessions will start getting 404s. For multi-replica deployments,
+implement `SessionStore` over a shared store (e.g. Redis); no shared implementation ships here.
+
+**Relationship to the SDK's built-in auth.** The SDK's `StreamableHTTPHandler` already does a form of this on its own
+path: if a request's context carries an `auth.TokenInfo` (set by `auth.RequireBearerToken`) with a non-empty
+`UserID`, the session is bound to that `UserID` and mismatches get a 403. Servers using the SDK's built-in auth get
+this, provided their `TokenVerifier` sets `UserID` (and, for multiple issuers, folds the issuer into it). Servers
+bringing their own validator, like this Guard, never populate `auth.TokenInfo`, so the SDK doesn't bind anything and
+they need `WithSessionBinding`.
+
 ## Security Testing
 
 Every hand-written parsing/comparison path (the two places this project does its own claim-shape handling rather than
@@ -181,6 +225,8 @@ A few deliberate decisions worth calling out for anyone reviewing this:
   anywhere yet. Advertising scopes that aren't checked seemed worse than omitting the field.
 - No logging on the middleware's failure paths. The client learning nothing shouldn't mean the operator learns nothing.
 - No opt-out for the `passthrough.Guard` false positive described above.
+- `MemorySessionStore` is single-instance. Behind a load balancer with several replicas, each replica only knows the
+  sessions it bound itself; use a shared `SessionStore` implementation instead.
 
 ## Project layout
 
@@ -189,7 +235,7 @@ cmd/reference-server   a full, runnable demonstration of the middleware
 discovery              Protected Resource Metadata (RFC 9728) handler
 token                  token validation, resource indicator + issuer binding checks
 challenge              401 + WWW-Authenticate response helper
-middleware             the Guard that ties the above together into an http.Handler wrapper
+middleware             the Guard that ties the above together into an http.Handler wrapper, plus session binding
 passthrough            the token-passthrough RoundTripper guard
 ```
 
